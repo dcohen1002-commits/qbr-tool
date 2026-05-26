@@ -307,21 +307,30 @@ export default function App() {
   async function generateBrief() {
     setLoading(true);
     setBriefErr(null);
-
-    // ----------------------------------------------------------
-    //  LIVE CALL GOES HERE (next session, at deploy):
-    //  Replace the sample block below with a fetch to our own
-    //  Vercel serverless function, e.g. fetch("/api/brief", {...})
-    //  which holds the Anthropic key securely server-side and
-    //  uses customerFacts(c) to build the prompt.
-    // ----------------------------------------------------------
+    const c = CUSTOMERS[key];
 
     try {
-      // Simulate generation latency so the feature feels live
-      await new Promise((r) => setTimeout(r, 1100));
-      setBrief((prev) => ({ ...prev, [key]: SAMPLE_BRIEFS[key] }));
+      // Call OUR serverless function (which safely holds the API key server-side)
+      const res = await fetch("/api/brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ facts: customerFacts(c) }),
+      });
+
+      if (!res.ok) throw new Error("Server returned " + res.status);
+
+      const data = await res.json();
+      if (data.brief) {
+        setBrief((prev) => ({ ...prev, [key]: data.brief }));
+      } else {
+        throw new Error("No brief in response");
+      }
     } catch (e) {
-      setBriefErr("Couldn't load the brief — try again.");
+      // Fallback: show the pre-written sample so the demo never breaks
+      console.warn("Live brief failed, using sample:", e);
+      await new Promise((r) => setTimeout(r, 300));
+      setBrief((prev) => ({ ...prev, [key]: SAMPLE_BRIEFS[key] }));
+      setBriefErr("Showing a sample brief — live generation unavailable.");
     } finally {
       setLoading(false);
     }
